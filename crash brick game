@@ -1,0 +1,142 @@
+import pygame
+import sys
+import random
+
+# 초기화
+pygame.init()
+
+# 화면 크기 설정
+width, height = 800, 600
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("벽돌 부수기 게임")
+
+# 색깔 정의
+white = (255, 255, 255)
+black = (0, 0, 0)
+red = (255, 0, 0)
+
+# 패들 설정
+paddle_width, paddle_height = 100, 20
+paddle_x = width // 2 - paddle_width // 2
+paddle_y = height - 50
+paddle_speed = 8
+
+# 공 설정
+ball_radius = 8
+ball_x = width // 2
+ball_y = height // 2
+ball_speed_x = 5
+ball_speed_y = -5  # 공이 위로 떠오르게 수정
+
+# 벽돌 설정
+brick_width, brick_height = 60, 20
+bricks = []
+for i in range(8):
+    for j in range(12):
+        brick = pygame.Rect(j * (brick_width + 5), i * (brick_height + 5), brick_width, brick_height)
+        bricks.append(brick)
+
+# 폰트 설정
+font_path = "DOSMyungjo-16.bdf"
+font = pygame.font.Font(font_path, 36)
+
+# 게임 오버 및 시작 상태
+game_over = False
+game_started = True  # 시작 상태로 변경
+# 스코어 변수
+score = 0
+
+# 패들 속도 변수
+paddle_speed = 8  # 초기 패들 속도
+
+# 게임 루프
+balls = [{"x": ball_x, "y": ball_y, "speed_x": ball_speed_x, "speed_y": ball_speed_y}]
+new_ball_added = False  # 이 부분을 추가
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+    if not game_over:
+        # 패들 이동
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and paddle_x > 0:
+            paddle_x -= paddle_speed  # 패들 속도 변수 사용
+        if keys[pygame.K_RIGHT] and paddle_x < width - paddle_width:
+            paddle_x += paddle_speed  # 패들 속도 변수 사용
+
+        # 스코어가 300점 이상이면 패들 속도 증가
+        if score >= 300:
+            paddle_speed = 20
+
+        for ball in balls:
+            # 각각의 공 이동
+            ball["x"] += ball["speed_x"]
+            ball["y"] += ball["speed_y"]
+
+            # 벽과 충돌 체크
+            if ball["x"] <= 0 or ball["x"] >= width:
+                ball["speed_x"] = -ball["speed_x"]
+            if ball["y"] <= 0:
+                ball["speed_y"] = -ball["speed_y"]
+
+            # 패들과 충돌 체크
+            if paddle_y <= ball["y"] <= paddle_y + paddle_height and paddle_x <= ball["x"] <= paddle_x + paddle_width:
+                ball["speed_y"] = -ball["speed_y"]
+
+            # 벽돌과 충돌 체크
+            for brick in bricks:
+                if brick.colliderect(pygame.Rect(ball["x"] - ball_radius, ball["y"] - ball_radius, 2 * ball_radius,
+                                                 2 * ball_radius)):
+                    bricks.remove(brick)
+                    ball["speed_y"] = -ball["speed_y"]
+                    score += 10  # 벽돌을 깰 때마다 점수 증가
+
+        # 게임 오버 조건
+        if all(ball["y"] >= height for ball in balls) or (
+                score >= 300 and any(ball["y"] >= height for ball in balls)):
+            game_over = True
+
+        # 스코어가 300점 이상이면 새로운 공 추가
+        if score >= 300 and len(bricks) > 0 and not new_ball_added:
+            new_ball = {"x": random.randint(0, width), "y": height // 2, "speed_x": ball_speed_x,
+                        "speed_y": -ball_speed_y}
+            balls.append(new_ball)
+            new_ball_added = True
+        elif score < 300:
+            new_ball_added = False
+
+    # 화면 그리기
+    screen.fill(black)
+
+    if game_over:
+        text = font.render("게임 오버! 스코어: {}".format(score), True, white)
+        screen.blit(text, (width // 2 - text.get_width() // 2, height // 2 - text.get_height() // 2))
+
+    else:
+        pygame.draw.rect(screen, white, (paddle_x, paddle_y, paddle_width, paddle_height))
+        for ball in balls:
+            pygame.draw.circle(screen, red, (ball["x"], ball["y"]), ball_radius)
+
+        for brick in bricks:
+            # 랜덤한 밝은 색상 생성
+            brick_color = (random.randint(150, 255), random.randint(150, 255), random.randint(150, 255))
+            pygame.draw.rect(screen, brick_color, brick)
+
+        # 모든 벽돌을 깼는지 체크
+        if not bricks:
+            game_over = True
+
+        # 스코어 표시 (파란색으로 변경)
+        score_text = font.render("스코어: {}".format(score), True, pygame.Color("blue"))
+        screen.blit(score_text, (10, 10))
+
+    pygame.display.flip()
+
+    # 게임 오버 상태에서는 대기 시간을 늘려 사용자가 메시지를 확인할 수 있게 함
+    if game_over:
+        pygame.time.wait(2000)
+
+    pygame.time.Clock().tick(60)
